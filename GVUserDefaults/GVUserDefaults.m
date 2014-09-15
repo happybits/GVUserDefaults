@@ -160,6 +160,52 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         objc_property_t property = properties[i];
         const char *name = property_getName(property);
         const char *attributes = property_getAttributes(property);
+        
+        IMP getterImp = NULL;
+        IMP setterImp = NULL;
+        char type = attributes[1];
+        switch (type) {
+            case Short:
+            case Long:
+            case LongLong:
+            case UnsignedChar:
+            case UnsignedShort:
+            case UnsignedInt:
+            case UnsignedLong:
+            case UnsignedLongLong:
+                getterImp = (IMP)longLongGetter;
+                setterImp = (IMP)longLongSetter;
+                break;
+                
+            case Bool:
+            case Char:
+                getterImp = (IMP)boolGetter;
+                setterImp = (IMP)boolSetter;
+                break;
+                
+            case Int:
+                getterImp = (IMP)integerGetter;
+                setterImp = (IMP)integerSetter;
+                break;
+                
+            case Float:
+                getterImp = (IMP)floatGetter;
+                setterImp = (IMP)floatSetter;
+                break;
+                
+            case Double:
+                getterImp = (IMP)doubleGetter;
+                setterImp = (IMP)doubleSetter;
+                break;
+                
+            case Object:
+                getterImp = (IMP)objectGetter;
+                setterImp = (IMP)objectSetter;
+                break;
+                
+            default:
+                continue;
+        }
 
         char *getter = strstr(attributes, ",G");
         if (getter) {
@@ -184,54 +230,6 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         NSString *key = [self defaultsKeyForPropertyNamed:name];
         [self.mapping setValue:key forKey:NSStringFromSelector(getterSel)];
         [self.mapping setValue:key forKey:NSStringFromSelector(setterSel)];
-
-        IMP getterImp = NULL;
-        IMP setterImp = NULL;
-        char type = attributes[1];
-        switch (type) {
-            case Short:
-            case Long:
-            case LongLong:
-            case UnsignedChar:
-            case UnsignedShort:
-            case UnsignedInt:
-            case UnsignedLong:
-            case UnsignedLongLong:
-                getterImp = (IMP)longLongGetter;
-                setterImp = (IMP)longLongSetter;
-                break;
-
-            case Bool:
-            case Char:
-                getterImp = (IMP)boolGetter;
-                setterImp = (IMP)boolSetter;
-                break;
-
-            case Int:
-                getterImp = (IMP)integerGetter;
-                setterImp = (IMP)integerSetter;
-                break;
-
-            case Float:
-                getterImp = (IMP)floatGetter;
-                setterImp = (IMP)floatSetter;
-                break;
-
-            case Double:
-                getterImp = (IMP)doubleGetter;
-                setterImp = (IMP)doubleSetter;
-                break;
-
-            case Object:
-                getterImp = (IMP)objectGetter;
-                setterImp = (IMP)objectSetter;
-                break;
-
-            default:
-                free(properties);
-                [NSException raise:NSInternalInconsistencyException format:@"Unsupported type of property \"%s\" in class %@", name, self];
-                break;
-        }
 
         char types[5];
 
