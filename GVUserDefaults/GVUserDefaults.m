@@ -10,6 +10,7 @@
 #import <objc/runtime.h>
 
 @interface GVUserDefaults ()
+@property (strong, nonatomic) NSString *initializedSuiteName;
 @property (strong, nonatomic) NSMutableDictionary *mapping;
 @property (strong, nonatomic) NSUserDefaults *userDefaults;
 @end
@@ -137,9 +138,11 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
 #pragma GCC diagnostic ignored "-Wundeclared-selector"
 #pragma GCC diagnostic ignored "-Warc-performSelector-leaks"
 
-- (instancetype)init {
+- (instancetype)initWithSuiteName:(NSString *)suiteName {
     self = [super init];
     if (self) {
+        self.initializedSuiteName = suiteName;
+
         SEL setupDefaultSEL = NSSelectorFromString([NSString stringWithFormat:@"%@pDefaults", @"setu"]);
         if ([self respondsToSelector:setupDefaultSEL]) {
             NSDictionary *defaults = [self performSelector:setupDefaultSEL];
@@ -158,6 +161,10 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
     return self;
 }
 
+- (instancetype)init {
+    return [self initWithSuiteName:nil];
+}
+
 - (NSString *)_transformKey:(NSString *)key {
     if ([self respondsToSelector:@selector(transformKey:)]) {
         return [self performSelector:@selector(transformKey:) withObject:key];
@@ -167,6 +174,10 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
 }
 
 - (NSString *)_suiteName {
+    if (self.initializedSuiteName) {
+        return self.initializedSuiteName;
+    }
+
     // Backwards compatibility (v 1.0.0)
     if ([self respondsToSelector:@selector(suitName)]) {
         return [self performSelector:@selector(suitName)];
@@ -191,7 +202,7 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         objc_property_t property = properties[i];
         const char *name = property_getName(property);
         const char *attributes = property_getAttributes(property);
-        
+
         IMP getterImp = NULL;
         IMP setterImp = NULL;
         char type = attributes[1];
@@ -207,33 +218,33 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
                 getterImp = (IMP)longLongGetter;
                 setterImp = (IMP)longLongSetter;
                 break;
-                
+
             case Bool:
             case Char:
                 getterImp = (IMP)boolGetter;
                 setterImp = (IMP)boolSetter;
                 break;
-                
+
             case Int:
                 getterImp = (IMP)integerGetter;
                 setterImp = (IMP)integerSetter;
                 break;
-                
+
             case Float:
                 getterImp = (IMP)floatGetter;
                 setterImp = (IMP)floatSetter;
                 break;
-                
+
             case Double:
                 getterImp = (IMP)doubleGetter;
                 setterImp = (IMP)doubleSetter;
                 break;
-                
+
             case Object:
                 getterImp = (IMP)objectGetter;
                 setterImp = (IMP)objectSetter;
                 break;
-                
+
             default:
                 continue;
         }
@@ -266,7 +277,7 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
 
         snprintf(types, 4, "%c@:", type);
         class_addMethod([self class], getterSel, getterImp, types);
-        
+
         snprintf(types, 5, "v@:%c", type);
         class_addMethod([self class], setterSel, setterImp, types);
     }

@@ -12,4 +12,6 @@
 
 + (instancetype)standardUserDefaults;
 
+- (instancetype)initWithSuiteName:(NSString *)suiteName;
+
 @end
