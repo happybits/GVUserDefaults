@@ -196,11 +196,30 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
     unsigned int count = 0;
     objc_property_t *properties = class_copyPropertyList([self class], &count);
 
+    // Properties that should not be mapped to user defaults but appear in the copied property list. (It would be more technically correct to trawl through the runtime, but this seems easier and faster.)
+    static const char * const ignoredPropertyNames[] = {
+        // NSObject protocol
+        "hash",
+        "superclass",
+        "description",
+        "debugDescription",
+    };
+
     self.mapping = [NSMutableDictionary dictionary];
 
     for (int i = 0; i < count; ++i) {
         objc_property_t property = properties[i];
+
         const char *name = property_getName(property);
+        BOOL skip = NO;
+        for (int i = 0; i < (sizeof(ignoredPropertyNames) / sizeof(ignoredPropertyNames[0])); i++) {
+            if (!strcmp(ignoredPropertyNames[i], name)) {
+                skip = YES;
+                break;
+            }
+        }
+        if (skip) { continue; }
+
         const char *attributes = property_getAttributes(property);
 
         IMP getterImp = NULL;
