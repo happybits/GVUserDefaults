@@ -295,10 +295,12 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         char types[5];
 
         snprintf(types, 4, "%c@:", type);
-        class_addMethod([self class], getterSel, getterImp, types);
+        BOOL ok = class_addMethod([self class], getterSel, getterImp, types);
+        NSAssert(ok, @"could not dynamically add getter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
 
         snprintf(types, 5, "v@:%c", type);
-        class_addMethod([self class], setterSel, setterImp, types);
+        ok = class_addMethod([self class], setterSel, setterImp, types);
+        NSAssert(ok, @"could not dynamically add setter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
     }
 
     free(properties);
