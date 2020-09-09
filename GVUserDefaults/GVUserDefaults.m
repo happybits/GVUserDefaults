@@ -192,6 +192,33 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
 
 #pragma GCC diagnostic pop
 
+#if DEBUG
+/// Track which classes we've seen before. This helps us figure out why we might've failed to add generated accessors.
+static BOOL DidGenerateMethodsForClass(Class cls) {
+    static dispatch_semaphore_t sem;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sem = dispatch_semaphore_create(1);
+    });
+
+    dispatch_semaphore_wait(sem, 0);
+
+    static NSMutableArray<Class> *visited;
+    if (!visited) { visited = [NSMutableArray new]; }
+
+    BOOL didVisit = [visited containsObject:cls];
+
+    if (!didVisit) {
+        [visited addObject:cls];
+    }
+
+    dispatch_semaphore_signal(sem);
+
+    return didVisit;
+}
+#endif
+
+
 - (void)generateAccessorMethods {
     unsigned int count = 0;
     objc_property_t *properties = class_copyPropertyList([self class], &count);
@@ -204,6 +231,10 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         "description",
         "debugDescription",
     };
+
+#if DEBUG
+    BOOL didGenerateForClass = DidGenerateMethodsForClass([self class]);
+#endif
 
     self.mapping = [NSMutableDictionary dictionary];
 
@@ -295,12 +326,18 @@ static void objectSetter(GVUserDefaults *self, SEL _cmd, id object) {
         char types[5];
 
         snprintf(types, 4, "%c@:", type);
-        BOOL ok = class_addMethod([self class], getterSel, getterImp, types);
-        NSAssert(ok, @"could not dynamically add getter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
+        BOOL getterOK = class_addMethod([self class], getterSel, getterImp, types);
 
         snprintf(types, 5, "v@:%c", type);
-        ok = class_addMethod([self class], setterSel, setterImp, types);
-        NSAssert(ok, @"could not dynamically add setter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
+        BOOL setterOK = class_addMethod([self class], setterSel, setterImp, types);
+
+#if DEBUG
+        // We can't simply check the `class_addMethod` return values because it's ok to fail when there are multiple instances of the same `GVUserDefaults` subclass. We want to error loudly only when the first attempt fails.
+        if (!didGenerateForClass) {
+            NSAssert(getterOK, @"could not dynamically add getter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
+            NSAssert(setterOK, @"could not dynamically add setter for %1$s. Missing `@dynamic %1$s` in a .m file?", name);
+        }
+#endif
     }
 
     free(properties);
